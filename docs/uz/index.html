@@ -481,7 +481,7 @@ async function play(s) {
   for (const l of s.reply) { addLine(target, l); await wait(700); }
   $("#spoken-text").textContent = s.spoken;
   $("#spoken").classList.add("on");
-  $("#vs").textContent = "Reading aloud"; $("#vs").className = "vs read";
+  $("#vs").textContent = "Reading aloud…"; $("#vs").className = "vs read";
   await wait(4200);
   $("#vs").textContent = ""; $("#vs").className = "vs";
   $("#hold-hint").textContent = "gapirish uchun bosib turing";

@@ -325,7 +325,7 @@ def watch_focus():
         try:
             busy = speaker.busy()
             if busy != was_busy and not recording():
-                set_status("#[fg=cyan]Reading aloud#[default] " if busy else "")
+                set_status("#[fg=cyan]Reading aloud…#[default] " if busy else "")
             was_busy = busy
             pane = current_pane()
             if pane == last:
