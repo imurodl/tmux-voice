@@ -1,0 +1,52 @@
+# tmux-voice settings. Copied to ~/.config/tmux-voice/config.toml by install.sh.
+# Keys live in ~/.config/tmux-voice/env, not here.
+
+port = 8766   # must match `port` in ~/.hammerspoon/init.lua
+
+[stt]
+primary = "scribe"      # "scribe" (ElevenLabs Scribe v2) or "gemini" (Gemini 3.5 Transcribe)
+fallback = "gemini"     # used when the primary fails; "" for none
+language = ""           # "" auto-detects per recording (works for mixed languages); or e.g. "en", "uz", "ko"
+gemini_languages = []   # optional hints for Gemini, e.g. ["en-US", "ko-KR"]
+timeout = 15            # seconds before falling back
+
+[vocab]
+# Key terms sent with each recording so names are spelled right. Built from the active pane's project
+# (repo name, branch, recently changed files, dependencies) plus these sources.
+builtin = true          # common dev terms: Claude, Codex, CLAUDE.md, TypeScript, useEffect, ...
+extra = []              # always include, e.g. ["Supabase", "my-api"]; or one per line in ~/.config/tmux-voice/vocab.txt
+projects_dir = "~/projects"   # names of recently active folders here; "" to disable
+recent_projects = 25
+ssh_hosts = true        # Host aliases from ~/.ssh/config
+project_files = true
+dependencies = true
+max_terms = 150
+
+[routing]
+# Bundle ids treated as "terminal": text goes to the active tmux pane instead of being typed.
+terminals = [
+  "com.mitchellh.ghostty",
+  "com.googlecode.iterm2",
+  "com.apple.Terminal",
+  "net.kovidgoyal.kitty",
+  "com.github.wez.wezterm",
+  "org.alacritty",
+  "dev.warp.Warp-Stable",
+]
+agent_prefix = true       # "Claude, ..." / "Codex, ..." sends the rest to that agent's pane
+send_word = false         # end a recording with a send phrase to press Enter
+send_phrases = ["send it"]
+
+[speak]
+enabled = true          # read the first sentence of an agent's reply aloud after a voice prompt
+voice = ""              # macOS voice name (`say -v '?'`); "" uses the system voice
+max_words = 30
+
+[history]
+enabled = true          # ~/.local/state/tmux-voice/history.jsonl, used by `tmux-voice usage`
+store_text = true       # false keeps only durations and providers
+
+# Extra corrections applied after transcription (case-insensitive regex).
+# [[fixes]]
+# pattern = '\bsuper base\b'
+# replace = "Supabase"

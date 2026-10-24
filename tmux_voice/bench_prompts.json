@@ -1,0 +1,14 @@
+[
+  {"id": "en1", "cat": "Plain", "text": "Check why the build is failing on CI and fix the TypeScript errors, but don't touch the database schema.", "terms": ["CI", "TypeScript"]},
+  {"id": "en2", "cat": "Plain", "text": "Run the tests, and if anything fails, show me the stack trace before changing any code.", "terms": ["stack trace"]},
+  {"id": "en3", "cat": "Plain", "text": "Create a new branch called voice-input, add a README with setup steps, and open a pull request.", "terms": ["voice-input", "README", "pull request"]},
+  {"id": "cd1", "cat": "Code-heavy", "text": "Open src/app/api/route.ts and add zod validation to the POST handler.", "terms": ["route.ts", "zod", "POST"]},
+  {"id": "cd2", "cat": "Code-heavy", "text": "Run pnpm install, bump next to version 16 in package.json, then try a build.", "terms": ["pnpm", "package.json", "16"]},
+  {"id": "cd3", "cat": "Code-heavy", "text": "The useEffect in the dashboard fires twice on mount, find out why and fix it.", "terms": ["useEffect", "dashboard"]},
+  {"id": "ag1", "cat": "Agents", "text": "Claude, read CLAUDE.md and AGENTS.md first, then tell me what this project does.", "terms": ["Claude", "CLAUDE.md", "AGENTS.md"]},
+  {"id": "ag2", "cat": "Agents", "text": "Codex, review the last commit and tell me if anything looks risky.", "terms": ["Codex", "commit"]},
+  {"id": "ms1", "cat": "Messy", "text": "Hmm, okay, so... undo the last thing you did, no wait, not all of it, just the CSS changes.", "terms": ["CSS"]},
+  {"id": "ms2", "cat": "Messy", "text": "So the thing is, when users log in the token doesn't refresh, I think it's the auth client but I'm not sure, check the logs first.", "terms": ["token", "auth"]},
+  {"id": "nat1", "cat": "Your language", "text": "Say a typical instruction in your own language, or mix it with English the way you normally would. Edit bench_prompts.json to add your own scripts.", "terms": [], "free": true},
+  {"id": "free1", "cat": "Free", "text": "Speak freely, no script: describe a real task you'd give your agent today.", "terms": [], "free": true}
+]

@@ -1,0 +1,2 @@
+- Some of my messages are dictated by voice, so expect misheard words, fillers and mixed languages.
+- Infer the intent; ask only when a misheard word changes what to do.
