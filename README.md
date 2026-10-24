@@ -1,5 +1,7 @@
 # tmux-voice
 
+**Website:** https://imurodl.github.io/tmux-voice/
+
 Talk to Claude Code and Codex instead of typing. Hold a key, speak, release: the text lands in the prompt of the active tmux pane, ready for you to check and press Enter.
 
 Built for people who run coding agents in tmux on macOS, and for people who don't speak only English. Speech is transcribed with ElevenLabs Scribe v2 or Gemini 3.5 Transcribe, which detect the language on every recording, so English, Uzbek, Korean or a mix of them in one sentence all work without switching anything.
