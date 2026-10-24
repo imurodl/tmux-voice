@@ -1,11 +1,8 @@
 """Reads agents' final answers aloud: Kokoro (local, via mlx-audio) when installed, macOS `say` otherwise."""
 
-import os
 import queue
 import re
-import shutil
 import subprocess
-import tempfile
 import threading
 from pathlib import Path
 
@@ -68,30 +65,8 @@ class Speaker:
             if self.player and self.player.poll() is None:
                 self.player.terminate()
 
-    def _play(self, gen: int, text: str) -> bool:
-        """Synthesize and play one piece; False once this job was cancelled."""
-        path = None
-        if self.model is not None:
-            import soundfile as sf
-
-            audio = self._synth(self.model, text)
-            fd, path = tempfile.mkstemp(suffix=".wav")
-            os.close(fd)
-            sf.write(path, audio, RATE)
-            cmd = ["afplay", path]
-        else:
-            voice = self.cfg["say_voice"]
-            cmd = ["say", *(["-v", voice] if voice else []), text]
-        try:
-            with self.lock:
-                if gen != self.gen:
-                    return False
-                self.player = subprocess.Popen(cmd)
-            self.player.wait()
-        finally:
-            if path:
-                os.unlink(path)
-        return gen == self.gen
+    def _say_cmd(self, text: str) -> list[str]:
+        return (lambda self, text: ["say", *(["-v", self.cfg["say_voice"]] if self.cfg["say_voice"] else []), text])(self, text)
 
     def _worker(self):
         while True:
@@ -100,13 +75,48 @@ class Speaker:
                 continue
             self.active = True
             try:
-                for piece in pieces(text):
-                    if gen != self.gen or not self._play(gen, piece):
-                        break
+                if self.model is not None:
+                    self._stream(gen, pieces(text))
+                else:
+                    for part in pieces(text):
+                        with self.lock:
+                            if gen != self.gen:
+                                break
+                            self.player = subprocess.Popen(self._say_cmd(part))
+                        self.player.wait()
             except Exception as e:
                 print(f"speak failed: {e}", flush=True)
             finally:
                 self.active = False
+
+    def _stream(self, gen: int, parts: list[str]):
+        """Play pieces back to back through one output stream while the next piece is synthesized."""
+        import numpy as np
+        import sounddevice as sd
+
+        ready: queue.Queue = queue.Queue(maxsize=2)
+
+        def produce():
+            for part in parts:
+                if gen != self.gen:
+                    break
+                ready.put(self._synth(self.model, part).astype(np.float32))
+            ready.put(None)
+
+        threading.Thread(target=produce, daemon=True).start()
+        block = RATE // 10
+        # Blocking writes from this thread only: no Python runs in the CoreAudio thread, so stopping can't deadlock.
+        with sd.OutputStream(samplerate=RATE, channels=1, dtype="float32") as out:
+            while gen == self.gen:
+                audio = ready.get()
+                if audio is None:
+                    break
+                for i in range(0, len(audio), block):
+                    if gen != self.gen:
+                        break
+                    out.write(audio[i:i + block].reshape(-1, 1))
+            if gen != self.gen:
+                out.abort()
 
 
 def kokoro_installed() -> bool:
@@ -115,13 +125,16 @@ def kokoro_installed() -> bool:
         import misaki  # noqa: F401
     except ImportError:
         return False
-    return shutil.which("afplay") is not None
+    return True
 
 
 def pieces(text: str, max_words: int = 40) -> list[str]:
-    """Split into chunks of whole sentences so long answers start playing right away."""
-    out, cur = [], ""
-    for sentence in re.split(r"(?<=[.!?:])\s+", text):
+    """The first sentence alone (so speech starts right away), then chunks of whole sentences."""
+    sentences = [s for s in re.split(r"(?<=[.!?:])\s+", text.strip()) if s]
+    if not sentences:
+        return []
+    out, cur = [sentences[0]], ""
+    for sentence in sentences[1:]:
         if cur and len((cur + " " + sentence).split()) > max_words:
             out.append(cur)
             cur = sentence
