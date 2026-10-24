@@ -98,6 +98,14 @@ def find_agent(kind: str) -> dict | None:
     return max(cands, key=lambda p: (p["active"], p["activity"]), default=None)
 
 
+def type_into(pane: str, text: str):
+    """Type text into a pane in small bursts. Agent TUIs treat one big burst as a paste: Claude Code then keeps
+    only the last ~1 KB, and a bracketed paste would collapse into "[Pasted text]" that you can't review."""
+    for i in range(0, len(text), 48):
+        tmux("send-keys", "-t", pane, "-l", "--", text[i:i + 48])
+        time.sleep(0.02)
+
+
 def wav_bytes(frames: list[np.ndarray]) -> bytes:
     buf = io.BytesIO()
     with wave.open(buf, "wb") as w:
@@ -214,7 +222,7 @@ async def stop(req: Request):
 
     inserted = False
     if target and text:
-        tmux("send-keys", "-t", target["id"], "-l", "--", text)
+        await asyncio.to_thread(type_into, target["id"], text)
         if submit:
             tmux("send-keys", "-t", target["id"], "Enter")
         voiced[target["id"]] = time.time()
