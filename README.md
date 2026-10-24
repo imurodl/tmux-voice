@@ -1,6 +1,6 @@
 # tmux-voice
 
-**Website:** https://imurodl.github.io/tmux-voice/
+**Website:** https://imurodl.me/tmux-voice/
 
 Talk to Claude Code and Codex instead of typing. Hold a key, speak, release: the text lands in the prompt of the active tmux pane, ready for you to check and press Enter.
 
