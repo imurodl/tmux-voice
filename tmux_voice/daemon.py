@@ -16,11 +16,10 @@ import numpy as np
 import sounddevice as sd
 from fastapi import FastAPI, Request
 
-from . import stt, vocab
+from . import stt, tts, vocab
 from .config import STATE_DIR, load
 
 RATE = 16000
-VOICED_TTL = 30 * 60
 ROUTE = re.compile(r"^\s*(claude|codex)\s*[,:.\-]\s*", re.I)
 BUILTIN_FIXES = [
     (r"\b(?:cloud|claude)\s*\.?\s*md\b", "CLAUDE.md"),
@@ -35,13 +34,18 @@ FIXES = [(re.compile(p, re.I), r) for p, r in BUILTIN_FIXES]
 FIXES += [(re.compile(f["pattern"], re.I), f["replace"]) for f in cfg["fixes"]]
 SEND = re.compile(r"[\s,.]*\b(" + "|".join(map(re.escape, cfg["routing"]["send_phrases"])) + r")[.!]?\s*$", re.I)
 HISTORY = STATE_DIR / "history.jsonl"
+AUTO_FLAG = STATE_DIR / "auto-read"
+FINALS = STATE_DIR / "finals.json"
 STATE_DIR.mkdir(parents=True, exist_ok=True)
 
 app = FastAPI()
 http = httpx.AsyncClient(timeout=30)
 lock = threading.Lock()
-state = {"rec": None, "say": None}
+state = {"rec": None}
 voiced: dict[str, float] = {}  # pane_id -> time of last voice prompt
+finals: dict[str, dict] = json.loads(FINALS.read_text()) if FINALS.exists() else {}  # pane_id -> {"text", "read"}
+working: set[str] = set()  # panes whose agent got a prompt and hasn't finished
+speaker = tts.Speaker(cfg)
 
 
 def tmux(*args: str) -> str:
@@ -69,9 +73,24 @@ def panes() -> list[dict]:
     return out
 
 
-def active_pane() -> dict | None:
-    pid = tmux("display-message", "-p", "#{pane_id}")
+def focused_client() -> str | None:
+    """The tmux client whose terminal has keyboard focus (needs `focus-events on`), in any app: Ghostty, Zed, ..."""
+    for line in tmux("list-clients", "-F", "#{client_name}\t#{client_flags}").splitlines():
+        name, flags = line.split("\t")
+        if "focused" in flags.split(","):
+            return name
+    return None
+
+
+def active_pane(client: str | None = None) -> dict | None:
+    pid = tmux("display-message", *(["-c", client] if client else []), "-p", "#{pane_id}")
     return next((p for p in panes() if p["id"] == pid), None)
+
+
+def current_pane() -> str | None:
+    """The pane you're looking at: the active pane of the tmux client with keyboard focus."""
+    client = focused_client()
+    return (active_pane(client) or {}).get("id") if client else None
 
 
 def find_agent(kind: str) -> dict | None:
@@ -89,10 +108,18 @@ def wav_bytes(frames: list[np.ndarray]) -> bytes:
     return buf.getvalue()
 
 
+def auto_read() -> bool:
+    if AUTO_FLAG.exists():
+        return AUTO_FLAG.read_text().strip() == "1"
+    return cfg["speak"]["auto"]
+
+
+def save_finals():
+    FINALS.write_text(json.dumps(finals, ensure_ascii=False))
+
+
 def stop_speaking():
-    p = state["say"]
-    if p and p.poll() is None:
-        p.terminate()
+    speaker.stop()
 
 
 def recording() -> bool:
@@ -125,7 +152,7 @@ def start():
         thread.start()
         state["rec"] = {"thread": thread, "stop": stop, "frames": frames}
     ready.wait(3)
-    set_status("#[fg=red,bold]● REC#[default] ")
+    set_status("#[fg=red,bold]● Listening…#[default] ")
     return {"ok": True}
 
 
@@ -162,13 +189,14 @@ async def stop(req: Request):
     if seconds < 0.4:
         set_status("")
         return {"text": "", "inserted": False}
-    set_status("#[fg=yellow]… STT#[default] ")
-    target = active_pane() if body.get("app") in cfg["routing"]["terminals"] else None
+    set_status("#[fg=yellow]Transcribing…#[default] ")
+    client = focused_client()
+    target = active_pane(client) if client or body.get("app") in cfg["routing"]["terminals"] else None
     try:
         text, provider, ms = await stt.transcribe(
             wav_bytes(frames), vocab.terms_for(target and target["path"], cfg), cfg, http)
     except Exception as e:
-        set_status("#[fg=red]STT failed#[default] ")
+        set_status("#[fg=red]Transcription failed#[default] ")
         threading.Timer(3, lambda: recording() or set_status("")).start()
         print(f"transcription failed: {e}", flush=True)
         return {"text": "", "inserted": False, "error": str(e)}
@@ -205,31 +233,26 @@ async def stop(req: Request):
     return {"text": text, "inserted": inserted}
 
 
-def summarize(text: str, max_words: int) -> str:
-    text = re.sub(r"```.*?```", " ", text, flags=re.S)
-    text = re.sub(r"^\s*[|#>-].*$", " ", text, flags=re.M)
-    text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
-    text = re.sub(r"[*_`~]", "", text)
-    text = re.sub(r"\s+", " ", text).strip()
-    out = ""
-    for s in re.split(r"(?<=[.!?])\s+", text):
-        if out and len((out + " " + s).split()) > max_words:
-            break
-        out = (out + " " + s).strip()
-    return " ".join(out.split()[: max_words + 10])
+def read_final(pane: str) -> bool:
+    f = finals.get(pane)
+    line = tts.for_speech(f["text"], cfg["speak"]["max_words"]) if f else ""
+    if f:
+        f["read"] = True
+        save_finals()
+    if line:
+        speaker.speak(line)
+    return bool(line)
 
 
-def speak(pane: str, message: str):
-    if not cfg["speak"]["enabled"] or not message or recording():
+def set_final(pane: str, text: str):
+    """An agent finished: keep its answer for this pane; read it now if you're looking at the pane."""
+    if not text.strip():
         return
-    if time.time() - voiced.get(pane, 0) > VOICED_TTL:
-        return
-    line = summarize(message, cfg["speak"]["max_words"])
-    if not line:
-        return
-    stop_speaking()
-    voice = cfg["speak"]["voice"]
-    state["say"] = subprocess.Popen(["say", *(["-v", voice] if voice else []), line])
+    finals[pane] = {"text": text, "read": False}
+    working.discard(pane)
+    save_finals()
+    if current_pane() == pane and auto_read() and not recording():
+        read_final(pane)
 
 
 def last_assistant_text(transcript_path: str) -> str:
@@ -241,30 +264,84 @@ def last_assistant_text(transcript_path: str) -> str:
             except ValueError:
                 continue
             if e.get("type") == "assistant" and not e.get("isSidechain"):
-                parts = e.get("message", {}).get("content", [])
+                parts = e.get("message", {}).get("content", []) or []
                 text = "".join(p.get("text", "") for p in parts if isinstance(p, dict) and p.get("type") == "text")
                 if text.strip():
                     last = text
     return last
 
 
+@app.post("/turn")
+async def turn_hook(req: Request):
+    """Claude Code UserPromptSubmit hook: a new turn started, so the old final answer is no longer current."""
+    pane = req.query_params.get("pane") or ""
+    finals.pop(pane, None)
+    working.add(pane)
+    save_finals()
+    return {"ok": True}
+
+
 @app.post("/speak")
 async def speak_hook(req: Request):
-    """Claude Code Stop hook payload; the pane id comes as ?pane=$TMUX_PANE."""
+    """Claude Code Stop hook: the turn finished; keep its final answer for this pane."""
     pane = req.query_params.get("pane") or ""
-    if pane not in voiced:
-        return {"spoken": False}
     body = await req.json()
-    message = body.get("last_assistant_message") or ""
-    if not message and body.get("transcript_path"):
+    text = body.get("last_assistant_message") or ""
+    if not text and body.get("transcript_path"):
         await asyncio.sleep(0.3)
-        message = last_assistant_text(body["transcript_path"])
-    speak(pane, message)
-    return {"spoken": True}
+        text = last_assistant_text(body["transcript_path"])
+    if pane:
+        set_final(pane, text)
+    return {"ok": True}
+
+
+@app.post("/speak-toggle")
+def speak_toggle():
+    """Hotkey: stop reading if it's talking, otherwise read the final answer of the pane you're on."""
+    if speaker.busy():
+        stop_speaking()
+        return {"action": "stopped"}
+    pane = current_pane()
+    if pane in finals and read_final(pane):
+        return {"action": "reading"}
+    return {"action": "working" if pane in working else "nothing"}
+
+
+@app.post("/auto-toggle")
+def auto_toggle():
+    """Menu bar click: turn automatic reading of final answers on or off."""
+    on = not auto_read()
+    AUTO_FLAG.write_text("1" if on else "0")
+    if not on:
+        stop_speaking()
+    return {"enabled": on}
+
+
+def watch_focus():
+    """Read a waiting final answer when you go to its pane; stop talking when you leave; show Reading aloud."""
+    last, was_busy = None, False
+    while True:
+        time.sleep(0.4)
+        try:
+            busy = speaker.busy()
+            if busy != was_busy and not recording():
+                set_status("#[fg=cyan]Reading aloud#[default] " if busy else "")
+            was_busy = busy
+            pane = current_pane()
+            if pane == last:
+                continue
+            last = pane
+            if speaker.busy():
+                speaker.stop()
+            f = finals.get(pane)
+            if f and not f["read"] and auto_read() and not recording():
+                read_final(pane)
+        except Exception as e:
+            print(f"focus watcher: {e}", flush=True)
 
 
 def watch_codex():
-    """Speak Codex turn completions for codex panes that received a voice prompt."""
+    """Keep Codex final answers for the panes running that session; a new prompt clears them."""
     base = Path.home() / ".codex" / "sessions"
     offsets: dict[Path, int] = {}
     cwds: dict[Path, str] = {}
@@ -294,22 +371,33 @@ def watch_codex():
                     except ValueError:
                         continue
                     p = e.get("payload", {})
-                    if e.get("type") == "event_msg" and p.get("type") == "task_complete":
-                        pane = next((x["id"] for x in panes() if x["kind"] == "codex" and x["path"] == cwds[f]
-                                     and x["id"] in voiced), None)
-                        if pane:
-                            speak(pane, p.get("last_agent_message") or "")
+                    is_final = (e.get("type") == "response_item" and p.get("type") == "message"
+                                and p.get("role") == "assistant" and p.get("phase") == "final_answer")
+                    is_prompt = e.get("type") == "event_msg" and p.get("type") == "user_message"
+                    if not (is_final or is_prompt):
+                        continue
+                    for x in panes():
+                        if x["kind"] == "codex" and x["path"] == cwds[f]:
+                            if is_prompt:
+                                finals.pop(x["id"], None)
+                                working.add(x["id"])
+                                save_finals()
+                            else:
+                                text = "".join(c.get("text", "") for c in p.get("content", []) if isinstance(c, dict))
+                                set_final(x["id"], text)
         except Exception as e:
             print(f"codex watcher: {e}", flush=True)
 
 
 @app.get("/status")
 def status():
-    return {"recording": recording(), "providers": stt.order(cfg), "voiced": list(voiced)}
+    return {"recording": recording(), "providers": stt.order(cfg), "voiced": list(voiced), "auto_read": auto_read(),
+            "tts": "kokoro" if speaker.model is not None else "say", "finals": {p: f["read"] for p, f in finals.items()}}
 
 
 def run():
     import uvicorn
 
     threading.Thread(target=watch_codex, daemon=True).start()
+    threading.Thread(target=watch_focus, daemon=True).start()
     uvicorn.run(app, host="127.0.0.1", port=cfg["port"], log_level="warning")

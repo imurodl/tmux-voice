@@ -38,9 +38,14 @@ send_word = false         # end a recording with a send phrase to press Enter
 send_phrases = ["send it"]
 
 [speak]
-enabled = true          # read the first sentence of an agent's reply aloud after a voice prompt
-voice = ""              # macOS voice name (`say -v '?'`); "" uses the system voice
-max_words = 30
+# When an agent finishes, its final answer is read aloud when you go to that pane (or right away if you're on it).
+# Ctrl+Option+Cmd+S starts or stops reading the focused pane's answer; clicking the menu bar item toggles `auto`.
+auto = true             # read finished answers automatically when you visit the pane
+engine = "kokoro"       # "kokoro" (local neural voice, Apple Silicon, `./install.sh` offers it) or "say" (macOS voice)
+kokoro_voice = "bf_emma" # e.g. af_heart, am_michael, bf_emma, bm_george (prefix: a=US, b=UK, f/m=female/male)
+say_voice = ""          # macOS voice for engine = "say"; "" uses the system voice
+speed = 1.05
+max_words = 600         # longer answers are cut here
 
 [history]
 enabled = true          # ~/.local/state/tmux-voice/history.jsonl, used by `tmux-voice usage`

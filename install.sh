@@ -48,10 +48,19 @@ fi
 step "Installing Python dependencies"
 (cd "$ROOT" && uv sync --quiet)
 
+step "Voice for reading answers aloud"
+if [ "$(uname -m)" = arm64 ] && ask "Install the local Kokoro voice for reading answers aloud (about 1 GB, runs offline)? Otherwise the macOS voice is used."; then
+  command -v brew >/dev/null && { brew list espeak-ng >/dev/null 2>&1 || brew install espeak-ng; }
+  (cd "$ROOT" && uv sync --quiet --extra kokoro)
+  ENGINE=kokoro
+else
+  ENGINE=say
+fi
+
 step "Config in $CONFIG_DIR"
 mkdir -p "$CONFIG_DIR"
 if [ ! -f "$CONFIG_DIR/config.toml" ]; then
-  sed "s/^port = 8766/port = $PORT/" "$ROOT/config.example.toml" > "$CONFIG_DIR/config.toml"
+  sed -e "s/^port = 8766/port = $PORT/" -e "s/^engine = \"kokoro\"/engine = \"$ENGINE\"/" "$ROOT/config.example.toml" > "$CONFIG_DIR/config.toml"
   echo "created config.toml"
 fi
 if [ ! -f "$CONFIG_DIR/env" ]; then
@@ -104,6 +113,7 @@ if [ "$DO_TMUX" = 1 ]; then
   strip_block "$TMUX_CONF"
   cat >> "$TMUX_CONF" <<'EOF'
 # tmux-voice begin
+set -g focus-events on
 if -F '#{m:*@voice*,#{status-right}}' '' 'set -ga status-right "#{@voice}"'
 # tmux-voice end
 EOF
@@ -112,21 +122,24 @@ EOF
 fi
 
 if [ "$DO_HOOK" = 1 ]; then
-  step "Claude Code Stop hook (spoken summaries)"
+  step "Claude Code hooks (final answers read aloud)"
   mkdir -p "$HOME/.claude"
   backup "$HOME/.claude/settings.json"
-  (cd "$ROOT" && ROOT="$ROOT" HOOK="$ROOT/hooks/claude-stop.sh $PORT" uv run --quiet python -c '
+  (cd "$ROOT" && ROOT="$ROOT" PORT="$PORT" uv run --quiet python -c '
 import json, os
 p = os.path.expanduser("~/.claude/settings.json")
 s = json.load(open(p)) if os.path.exists(p) else {}
-stop = s.setdefault("hooks", {}).setdefault("Stop", [])
-for group in stop:
-    group["hooks"] = [h for h in group.get("hooks", []) if not h.get("command", "").startswith(os.environ["ROOT"] + "/hooks/claude-stop.sh")]
-stop[:] = [g for g in stop if g["hooks"]]
-stop.append({"matcher": "", "hooks": [{"type": "command", "command": os.environ["HOOK"]}]})
+hooks = s.setdefault("hooks", {})
+for event, script in (("Stop", "claude-stop.sh"), ("UserPromptSubmit", "claude-prompt.sh")):
+    path = os.environ["ROOT"] + "/hooks/" + script
+    groups = hooks.setdefault(event, [])
+    for group in groups:
+        group["hooks"] = [h for h in group.get("hooks", []) if not h.get("command", "").startswith(path)]
+    groups[:] = [g for g in groups if g["hooks"]]
+    groups.append({"matcher": "", "hooks": [{"type": "command", "command": path + " " + os.environ["PORT"]}]})
 json.dump(s, open(p, "w"), indent=2)
 open(p, "a").write("\n")')
-  echo "added hook to ~/.claude/settings.json"
+  echo "added Stop and UserPromptSubmit hooks to ~/.claude/settings.json"
 fi
 
 if [ "$DO_INSTR" = 1 ] && ask "Tell Claude Code and Codex that prompts may be dictated (adds 2 lines to ~/.claude/CLAUDE.md and ~/.codex/AGENTS.md)?"; then

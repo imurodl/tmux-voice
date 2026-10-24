@@ -28,7 +28,14 @@ def doctor() -> int:
     check("STT provider key", bool(stt.order(cfg)), f"add ELEVENLABS_API_KEY or GEMINI_API_KEY to {CONFIG_DIR}/env")
     print(f"       providers in order: {', '.join(stt.order(cfg)) or 'none'}")
     check("tmux installed", bool(shutil.which("tmux")), "brew install tmux")
-    check("say available", bool(shutil.which("say")), "spoken summaries need macOS `say`")
+    from . import tts
+
+    engine = cfg["speak"]["engine"]
+    if engine == "kokoro":
+        check("Kokoro voice installed", tts.kokoro_installed(),
+              "re-run ./install.sh and accept the Kokoro voice, or set engine = \"say\" in config.toml")
+    else:
+        check("say available", bool(shutil.which("say")), "reading answers aloud needs macOS `say`")
     try:
         import sounddevice as sd
 
@@ -43,7 +50,7 @@ def doctor() -> int:
 
         r = httpx.get(f"http://127.0.0.1:{cfg['port']}/status", timeout=2).json()
         check(f"daemon running on port {cfg['port']}", True)
-        print(f"       recording={r['recording']} providers={r['providers']}")
+        print(f"       recording={r['recording']} providers={r['providers']} voice={r.get('tts')} auto_read={r.get('auto_read')}")
     except Exception:
         check(f"daemon running on port {cfg['port']}", False, "open Hammerspoon and use Reload Config")
     return 0 if ok else 1

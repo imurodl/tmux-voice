@@ -1,6 +1,8 @@
 -- tmux-voice: hold a key to talk, release to transcribe.
 -- Text goes to the active tmux pane when a terminal is frontmost, otherwise it is typed into the frontmost app.
 -- Any other key pressed while holding cancels the recording.
+-- Ctrl+Option+Cmd+S (opts.read_key) starts or stops reading the focused pane's final answer;
+-- clicking the menu bar item turns automatic reading on or off.
 --
 -- Usage in ~/.hammerspoon/init.lua:
 --   tmux_voice = dofile("/path/to/tmux-voice/hammerspoon/tmux_voice.lua").start({ root = "/path/to/tmux-voice" })
@@ -26,14 +28,36 @@ function M.start(opts)
   local stateDir = os.getenv("HOME") .. "/.local/state/tmux-voice"
 
   local held, pressedAt, cancelled = false, 0, false
+  local autoRead = true
   local menubar = opts.menubar ~= false and hs.menubar.new() or nil
   local function title(t) if menubar then menubar:setTitle(t) end end
-  title("mic")
+  local function idle() return autoRead and "mic" or "mic (quiet)" end
+  title(idle())
 
   local function post(path, body, cb)
     hs.http.asyncPost(url .. path, hs.json.encode(body or {}), { ["Content-Type"] = "application/json" },
       function(status, resp) if cb then cb(status, resp) end end)
   end
+
+  local function toggleRead()
+    post("/speak-toggle", {}, function(status, resp)
+      if status ~= 200 then hs.alert.show("tmux-voice: daemon not running"); return end
+      local action = (hs.json.decode(resp) or {}).action
+      if action == "working" then hs.alert.show("Still working, nothing to read yet", 1)
+      elseif action == "nothing" then hs.alert.show("No finished answer saved for this pane yet", 1) end
+    end)
+  end
+  local function toggleAuto()
+    post("/auto-toggle", {}, function(status, resp)
+      if status ~= 200 then hs.alert.show("tmux-voice: daemon not running"); return end
+      autoRead = (hs.json.decode(resp) or {}).enabled
+      title(idle())
+      hs.alert.show(autoRead and "Auto read: on" or "Auto read: off", 1)
+    end)
+  end
+  local readKey = opts.read_key or { { "ctrl", "alt", "cmd" }, "S" }
+  M.readHotkey = hs.hotkey.bind(readKey[1], readKey[2], toggleRead)
+  if menubar then menubar:setClickCallback(toggleAuto) end
 
   -- Daemon supervisor: a login shell finds uv on the user's PATH.
   local restarts = 0
@@ -58,18 +82,22 @@ function M.start(opts)
       print("tmux-voice: daemon not responding, restarting")
       hs.execute("lsof -ti tcp:" .. port .. " | xargs kill -9", true)
       pendingPing = false
-      title("mic")
+      title(idle())
       return
     end
     pendingPing = true
-    hs.http.asyncGet(url .. "/status", nil, function(status)
-      if status == 200 then pendingPing = false end
+    hs.http.asyncGet(url .. "/status", nil, function(status, resp)
+      if status == 200 then
+        pendingPing = false
+        local r = hs.json.decode(resp) or {}
+        if r.auto_read ~= nil and r.auto_read ~= autoRead and not held then autoRead = r.auto_read; title(idle()) end
+      end
     end)
   end)
 
   local function onDown()
     held, pressedAt, cancelled = true, hs.timer.secondsSinceEpoch(), false
-    title("● REC")
+    title("● Listening…")
     post("/start")
   end
 
@@ -77,12 +105,12 @@ function M.start(opts)
     held = false
     if cancelled then return end
     if hs.timer.secondsSinceEpoch() - pressedAt < minHold then
-      post("/cancel"); title("mic"); return
+      post("/cancel"); title(idle()); return
     end
-    title("…")
+    title("Transcribing…")
     local app = hs.application.frontmostApplication()
     post("/stop", { app = app and app:bundleID() or "" }, function(status, resp)
-      title("mic")
+      title(idle())
       if status ~= 200 then hs.alert.show("tmux-voice: daemon error " .. tostring(status)); return end
       local r = hs.json.decode(resp) or {}
       if r.error then hs.alert.show("tmux-voice: " .. r.error) end
@@ -101,7 +129,7 @@ function M.start(opts)
     if held and not cancelled then
       cancelled = true
       post("/cancel")
-      title("mic")
+      title(idle())
     end
     return false
   end)

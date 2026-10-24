@@ -103,9 +103,10 @@
   @keyframes blink { 50% { opacity: 0; } }
   .status { display: flex; justify-content: space-between; align-items: center; background: #1d2c45; padding: 5px 14px; font-size: 13px; color: #b9c6d8; }
   .status .win b { color: #fff; font-weight: 500; }
-  .vs { font-weight: 600; min-width: 80px; text-align: right; }
+  .vs { font-weight: 600; min-width: 120px; text-align: right; }
   .vs.rec { color: var(--rec); }
   .vs.stt { color: var(--stt); }
+  .vs.read { color: #6cc3d5; }
 
   .under { display: flex; justify-content: space-between; align-items: center; gap: 20px; margin-top: 18px; flex-wrap: wrap; min-height: 56px; }
   .hold { display: flex; align-items: center; gap: 14px; color: var(--muted); font-size: 15px; }
@@ -217,7 +218,7 @@
 
   <section class="hero">
     <h1><span>Bosib turing.</span><span>Gapiring.</span><span>Matn promptda.</span></h1>
-    <p class="lede">tmux ichidagi <strong>Claude Code va Codex</strong> uchun push-to-talk. Inglizcha, o‘zbekcha, koreyscha yoki bitta gapda uchalasini aralashtirib gapiring. Matn agentingiz promptiga tushadi, javobi esa sizga ovoz chiqarib o‘qib beriladi.</p>
+    <p class="lede">tmux ichidagi <strong>Claude Code va Codex</strong> uchun push-to-talk. Inglizcha, o‘zbekcha, koreyscha yoki bitta gapda uchalasini aralashtirib gapiring. Matn agentingiz promptiga tushadi, ish tugagach esa javobi kompyuteringizdagi ovoz bilan o‘qib beriladi.</p>
     <div class="cta">
       <div class="cmd"><span class="prompt-sign" aria-hidden="true">$</span><code id="install-cmd">git clone https://github.com/imurodl/tmux-voice &amp;&amp; cd tmux-voice &amp;&amp; ./install.sh</code><button class="copy" type="button" data-copy="install-cmd">Nusxalash</button></div>
       <a class="btn" href="https://github.com/imurodl/tmux-voice"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 .25a.75.75 0 01.673.418l1.882 3.815 4.21.612a.75.75 0 01.416 1.279l-3.046 2.97.719 4.192a.75.75 0 01-1.088.791L8 12.347l-3.766 1.98a.75.75 0 01-1.088-.79l.72-4.194L.818 6.374a.75.75 0 01.416-1.28l4.21-.611L7.327.668A.75.75 0 018 .25z"/></svg>GitHub’da yulduzcha bosing</a>
@@ -280,7 +281,7 @@
       <li><span class="n">2</span><h3>So‘zlarni bilish</h3><p>Repo nomi, branch, o‘zgargan fayllar, dependency’lar va SSH hostlar key term sifatida birga yuboriladi.</p></li>
       <li><span class="n">3</span><h3>Transkripsiya</h3><p>ElevenLabs Scribe v2, u ishlamasa avtomatik ravishda Gemini 3.5 Transcribe.</p></li>
       <li><span class="n">4</span><h3>Joyiga qo‘yish</h3><p>Aktiv tmux paneliga, Enter bosilmasdan. Yoki siz nomlagan panelga: “Codex, …”.</p></li>
-      <li><span class="n">5</span><h3>Javobni eshitish</h3><p>Ovoz bilan boshlagan so‘rovingiz tugaganda, agent javobining birinchi gapi ovozda o‘qiladi.</p></li>
+      <li><span class="n">5</span><h3>Javobni eshitish</h3><p>Agent ishni tugatganda, yakuniy javobi Mac’ingizda ishlaydigan ovoz bilan o‘qiladi: darhol yoki o‘sha panelga qaytganingizda.</p></li>
     </ol>
   </section>
 
@@ -310,10 +311,10 @@
     <h2>Har kuni asqatadigan mayda narsalar</h2>
     <div class="feats">
       <div><h3>Matn tushadi, o‘zi yuborilmaydi</h3><p>Hech narsa siz o‘rningizga yuborilmaydi. O‘qing, kerak bo‘lsa so‘zni tuzating, Enter bosing. Xohlasangiz, oxirida “send it” deng.</p></div>
-      <div><h3>Terminaldan tashqarida ham</h3><p>Oldingizda Slack yoki brauzer ochiq bo‘lsa, matn o‘sha yerga yoziladi.</p></div>
+      <div><h3>Fokusingizga ergashadi</h3><p>Fokusdagi tmux oynasi matnni oladi: istalgan terminalda yoki Zed’da. Editor, Slack yoki brauzer oldinda bo‘lsa, matn o‘sha yerga yoziladi.</p></div>
       <div><h3>Ko‘p uchraydigan xatolarni tuzatadi</h3><p>“cloud MD” CLAUDE.md bo‘ladi. “Cloud, run the tests” Claude’ga boradi. O‘z qoidalaringizni ham qo‘shishingiz mumkin.</p></div>
-      <div><h3>Holat ko‘z oldingizda</h3><p>tmux status satrida va menyu panelida qizil REC va sariq STT.</p></div>
-      <div><h3>O‘zini o‘zi tiklaydi</h3><p>Daemon javob bermay qolsa, watchdog uni qayta ishga tushiradi.</p></div>
+      <div><h3>Holat ko‘z oldingizda</h3><p>tmux status satrida va menyu panelida Listening, Transcribing va Reading aloud.</p></div>
+      <div><h3>Har qadam emas, faqat javob</h3><p>Faqat yakuniy javoblar o‘qiladi, agent ishlayotganda esa hech narsa. Ctrl+Option+Cmd+S to‘xtatadi yoki qayta o‘qiydi.</p></div>
       <div><h3>Narxini ko‘rsatadi</h3><p><code class="inline">tmux-voice usage</code> kuniga necha daqiqa gapirganingizni va taxminiy xarajatni ko‘rsatadi.</p></div>
     </div>
   </section>
@@ -323,7 +324,7 @@
     <div class="install">
       <div>
         <ol>
-          <li>Repo’ni clone qilib, installer’ni ishga tushiring. U yetishmayotganlarini (tmux, uv, Hammerspoon) so‘rab o‘rnatadi va ElevenLabs yoki Gemini API kalitini so‘raydi.</li>
+          <li>Repo’ni clone qilib, installer’ni ishga tushiring. U yetishmayotganlarini (tmux, uv, Hammerspoon) so‘rab o‘rnatadi, lokal Kokoro ovozini taklif qiladi va ElevenLabs yoki Gemini API kalitini so‘raydi.</li>
           <li>System Settings → Privacy &amp; Security → Accessibility’da Hammerspoon’ni yoqing, keyin uni yopib, qayta oching.</li>
           <li>Right Option’ni bosib turing, biror narsa deng va qo‘yib yuboring. Birinchi marta mikrofonga ruxsat bering.</li>
         </ol>
@@ -331,6 +332,7 @@
         <div class="costs">
           <p><b>Narxi:</b> Scribe v2’da bir soatlik nutq taxminan $0.27. Qizg‘in ish kunida 30–60 daqiqa gapiriladi, demak har kuni ishlatsangiz oyiga taxminan $3–6.</p>
           <p><b>Agent obunangiz:</b> deyarli sezilmaydi. Ovozli prompt o‘n minglab token ishlaydigan har bir turnga bor-yo‘g‘i bir necha o‘nta token qo‘shadi.</p>
+          <p><b>Javoblarni ovozda o‘qish:</b> bepul. Kokoro ovozi Mac’ingizda ishlaydi.</p>
         </div>
       </div>
       <pre><code><span class="c"># o‘rnatish</span>
@@ -458,13 +460,13 @@ async function play(s) {
   setFocus(s.focus);
   $("#spoken").classList.remove("on");
   await wait(900);
-  $("#key").classList.add("down"); $("#hold-hint").textContent = "yozilmoqda";
-  $("#vs").textContent = "● REC"; $("#vs").className = "vs rec";
+  $("#key").classList.add("down"); $("#hold-hint").textContent = "tinglanmoqda";
+  $("#vs").textContent = "● Listening…"; $("#vs").className = "vs rec";
   startWave();
   await wait(Math.min(5200, 1400 + s.said.length * 38));
   stopWave();
   $("#key").classList.remove("down"); $("#hold-hint").textContent = "qo‘yib yuborildi";
-  $("#vs").textContent = "… STT"; $("#vs").className = "vs stt";
+  $("#vs").textContent = "Transcribing…"; $("#vs").className = "vs stt";
   await wait(1100);
   $("#vs").textContent = ""; $("#hold-hint").textContent = "gapirish uchun bosib turing";
   const target = pane(s.to);
@@ -479,7 +481,9 @@ async function play(s) {
   for (const l of s.reply) { addLine(target, l); await wait(700); }
   $("#spoken-text").textContent = s.spoken;
   $("#spoken").classList.add("on");
+  $("#vs").textContent = "Reading aloud"; $("#vs").className = "vs read";
   await wait(4200);
+  $("#vs").textContent = ""; $("#vs").className = "vs";
   $("#hold-hint").textContent = "gapirish uchun bosib turing";
 }
 

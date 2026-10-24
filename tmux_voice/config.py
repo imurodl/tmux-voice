@@ -42,9 +42,12 @@ DEFAULTS = {
         "send_phrases": ["send it"],
     },
     "speak": {
-        "enabled": True,
-        "voice": "",
-        "max_words": 30,
+        "auto": True,
+        "engine": "kokoro",
+        "kokoro_voice": "bf_emma",
+        "say_voice": "",
+        "speed": 1.05,
+        "max_words": 600,
     },
     "history": {
         "enabled": True,

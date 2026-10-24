@@ -18,13 +18,14 @@ if [ -f "$HOME/.claude/settings.json" ]; then
 import json, os
 p = os.path.expanduser("~/.claude/settings.json")
 s = json.load(open(p))
-stop = s.get("hooks", {}).get("Stop", [])
-for group in stop:
-    group["hooks"] = [h for h in group.get("hooks", []) if not h.get("command", "").startswith(os.environ["ROOT"] + "/hooks/claude-stop.sh")]
-stop[:] = [g for g in stop if g["hooks"]]
+for event in ("Stop", "UserPromptSubmit"):
+    groups = s.get("hooks", {}).get(event, [])
+    for group in groups:
+        group["hooks"] = [h for h in group.get("hooks", []) if not h.get("command", "").startswith(os.environ["ROOT"] + "/hooks/")]
+    groups[:] = [g for g in groups if g["hooks"]]
 json.dump(s, open(p, "w"), indent=2)
 open(p, "a").write("\n")')
-  echo "removed Claude Code hook"
+  echo "removed Claude Code hooks"
 fi
 
 PORT=$(sed -n 's/^port *= *\([0-9]*\).*/\1/p' "$HOME/.config/tmux-voice/config.toml" 2>/dev/null || true)
