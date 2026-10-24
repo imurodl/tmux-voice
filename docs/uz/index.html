@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tmux-voice: Claude Code va Codex bilan ovozda gaplashing</title>
+<meta name="description" content="macOS’da tmux ichidagi Claude Code va Codex uchun push-to-talk diktovka. Inglizcha, o‘zbekcha, koreyscha yoki bitta gapda uchalasini aralashtirib gapiring.">
+<link rel="alternate" hreflang="en" href="https://imurodl.me/tmux-voice/">
+<link rel="alternate" hreflang="uz" href="https://imurodl.me/tmux-voice/uz/">
+<meta property="og:title" content="tmux-voice">
+<meta property="og:description" content="Tugmani bosib turing, gapiring, matn agentingiz promptida. Aralash tildagi nutq, loyihaga mos lug‘at, javoblar ovozda o‘qiladi.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #f1f4f7;
+    --panel: #ffffff;
+    --ink: #17212d;
+    --muted: #5a6574;
+    --line: #d6dce3;
+    --term: #0f1a2b;
+    --term-2: #16243a;
+    --term-ink: #d9e2ee;
+    --term-dim: #7f90a8;
+    --rec: #e5484d;
+    --stt: #e3a13a;
+    --ok: #3fb27f;
+    --bar: #9aa6b6;
+    --bar-strong: #17212d;
+    --focus: #2f6fd8;
+    --display: "Big Shoulders Display", "Arial Narrow", sans-serif;
+    --sans: "IBM Plex Sans", "IBM Plex Sans KR", system-ui, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #0e1520;
+      --panel: #151f2d;
+      --ink: #e4eaf1;
+      --muted: #97a3b3;
+      --line: #263345;
+      --term: #0a1220;
+      --term-2: #111c2e;
+      --bar: #4f5d70;
+      --bar-strong: #e4eaf1;
+      --focus: #7aa7f5;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font: 17px/1.6 var(--sans); }
+  a { color: inherit; }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; border-radius: 4px; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+  .measure { max-width: 64ch; }
+
+  header.top { display: flex; justify-content: space-between; align-items: center; padding: 22px 0; }
+  .wordmark { font: 800 26px/1 var(--display); letter-spacing: .01em; text-decoration: none; }
+  .wordmark .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--rec); margin-left: 6px; vertical-align: 4px; }
+  .nav { display: flex; align-items: center; gap: 18px; }
+  .lang { font-size: 15px; font-weight: 500; color: var(--muted); text-decoration: none; }
+  .lang:hover { color: var(--ink); text-decoration: underline; }
+  .gh { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; font-weight: 500; font-size: 15px; padding: 8px 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); }
+  .gh svg { width: 18px; height: 18px; fill: currentColor; }
+
+  /* Hero */
+  .hero { padding: 16px 0 40px; }
+  h1 { font: 900 clamp(52px, 8.4vw, 118px)/.86 var(--display); letter-spacing: -.005em; margin: 0; text-transform: none; }
+  h1 span { display: block; }
+  .lede { font-size: clamp(18px, 2.1vw, 21px); color: var(--muted); margin: 22px 0 0; max-width: 52ch; }
+  .lede strong { color: var(--ink); font-weight: 600; }
+  .cta { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 28px; }
+  .cmd { display: flex; align-items: center; gap: 12px; background: var(--term); color: var(--term-ink); font: 15px/1.4 var(--mono); padding: 12px 12px 12px 18px; border-radius: 10px; max-width: 100%; overflow-x: auto; }
+  .cmd code { white-space: nowrap; }
+  .cmd .prompt-sign { color: var(--term-dim); user-select: none; }
+  .copy { font: 500 13px var(--sans); color: var(--term-ink); background: var(--term-2); border: 1px solid #2a3a54; border-radius: 6px; padding: 6px 10px; cursor: pointer; white-space: nowrap; }
+  .copy:hover { border-color: var(--term-dim); }
+  .btn { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; font-weight: 600; padding: 12px 18px; border-radius: 10px; background: var(--ink); color: var(--paper); }
+  .btn svg { width: 18px; height: 18px; fill: currentColor; }
+
+  /* Demo */
+  .demo { margin: 36px 0 0; }
+  .tmux { background: var(--term); color: var(--term-ink); border-radius: 14px; overflow: hidden; font: 14px/1.55 var(--mono); box-shadow: 0 30px 60px -30px rgba(15, 26, 43, .55); }
+  .chrome { display: flex; align-items: center; gap: 8px; padding: 11px 14px; background: var(--term-2); }
+  .chrome i { width: 11px; height: 11px; border-radius: 50%; background: #2b3b55; }
+  .chrome span { margin-left: 8px; color: var(--term-dim); font-size: 12.5px; }
+  .panes { display: grid; grid-template-columns: 1fr 1fr; min-height: 290px; }
+  .pane { padding: 16px 18px 18px; display: flex; flex-direction: column; border-right: 1px solid #22324b; transition: background .3s; min-width: 0; }
+  .pane:last-child { border-right: 0; }
+  .pane.active { background: rgba(255, 255, 255, .025); }
+  .pane-name { color: var(--term-dim); font-size: 12.5px; display: flex; justify-content: space-between; }
+  .pane.active .pane-name b { color: var(--term-ink); }
+  .pane-name b { font-weight: 500; }
+  .log { flex: 1; padding: 12px 0; display: flex; flex-direction: column; justify-content: flex-end; gap: 6px; }
+  .log p { margin: 0; overflow-wrap: anywhere; }
+  .log .you { color: var(--term-dim); }
+  .log .bullet { color: var(--ok); }
+  .input { border: 1px solid #2c3d58; border-radius: 8px; padding: 9px 12px; min-height: 44px; overflow-wrap: anywhere; }
+  .input .gt { color: var(--term-dim); margin-right: 8px; }
+  .caret { display: inline-block; width: 8px; height: 1.1em; vertical-align: -3px; background: var(--term-ink); opacity: 0; }
+  .pane.active .caret { opacity: .85; animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .status { display: flex; justify-content: space-between; align-items: center; background: #1d2c45; padding: 5px 14px; font-size: 13px; color: #b9c6d8; }
+  .status .win b { color: #fff; font-weight: 500; }
+  .vs { font-weight: 600; min-width: 80px; text-align: right; }
+  .vs.rec { color: var(--rec); }
+  .vs.stt { color: var(--stt); }
+
+  .under { display: flex; justify-content: space-between; align-items: center; gap: 20px; margin-top: 18px; flex-wrap: wrap; min-height: 56px; }
+  .hold { display: flex; align-items: center; gap: 14px; color: var(--muted); font-size: 15px; }
+  .key { font: 500 14px var(--sans); color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-bottom-width: 4px; border-radius: 8px; padding: 9px 14px; transition: transform .08s, border-bottom-width .08s, background .2s, color .2s; white-space: nowrap; }
+  .key.down { transform: translateY(3px); border-bottom-width: 1px; background: var(--rec); color: #fff; border-color: var(--rec); }
+  .wave { display: flex; align-items: center; gap: 3px; height: 28px; }
+  .wave i { width: 3px; height: 4px; border-radius: 2px; background: var(--rec); opacity: .25; transition: height .09s, opacity .2s; }
+  .wave.on i { opacity: 1; }
+  .spoken { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 15px; opacity: 0; transition: opacity .4s; max-width: 52ch; }
+  .spoken.on { opacity: 1; }
+  .spoken svg { flex: none; width: 20px; height: 20px; stroke: var(--ink); fill: none; stroke-width: 1.8; }
+  .spoken em { font-style: normal; color: var(--ink); }
+
+  section.block { padding: 96px 0 0; }
+  h2 { font: 800 clamp(40px, 6vw, 72px)/.92 var(--display); margin: 0 0 18px; letter-spacing: 0; }
+  h3 { font: 600 18px/1.35 var(--sans); margin: 0 0 6px; }
+  .sub { color: var(--muted); margin: 0 0 36px; max-width: 60ch; }
+
+  /* Languages */
+  .said { display: grid; gap: 0; border-bottom: 1px solid var(--line); padding-bottom: 16px; }
+  .said figure { margin: 0; border-top: 1px solid var(--line); padding: 20px 0 4px; display: grid; grid-template-columns: 9.5rem 1fr; gap: 6px 22px; align-items: baseline; }
+  .said figcaption { color: var(--muted); font-size: 14px; }
+  .said .line { font-size: 21px; line-height: 1.45; }
+  .said .was { grid-column: 2; color: var(--muted); font-size: 15px; }
+  .said .was s { text-decoration-color: var(--rec); text-decoration-thickness: 2px; }
+  mark { background: none; color: inherit; border-bottom: 2px solid var(--ok); padding-bottom: 1px; }
+
+  /* Steps */
+  .steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, 1fr); gap: 0; border-top: 2px solid var(--ink); }
+  .steps li { padding: 18px 18px 0 0; }
+  .steps .n { font: 800 44px/1 var(--display); color: var(--muted); display: block; margin-bottom: 10px; }
+  .steps p { margin: 0; color: var(--muted); font-size: 15px; }
+
+  /* Numbers */
+  .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; }
+  .chart h3 { margin-bottom: 4px; }
+  .chart .unit { color: var(--muted); font-size: 14px; margin: 0 0 16px; }
+  .bars { display: grid; gap: 7px; }
+  .row { display: grid; grid-template-columns: 13.5rem 1fr 3.4rem; align-items: center; gap: 12px; font-size: 14px; position: relative; }
+  .row .name { color: var(--muted); }
+  .row.win .name { color: var(--ink); font-weight: 600; }
+  .track { height: 18px; position: relative; }
+  .fill { height: 100%; background: var(--bar); border-radius: 0 4px 4px 0; }
+  .row.win .fill { background: var(--bar-strong); }
+  .row .val { text-align: right; font-variant-numeric: tabular-nums; }
+  .row:hover .fill, .row:focus-visible .fill { filter: brightness(.85); }
+  .tip { position: absolute; z-index: 5; pointer-events: none; background: var(--ink); color: var(--paper); font-size: 13px; line-height: 1.45; padding: 8px 10px; border-radius: 8px; white-space: nowrap; opacity: 0; transform: translateY(4px); transition: opacity .12s, transform .12s; }
+  .tip.on { opacity: 1; transform: none; }
+  .fine { color: var(--muted); font-size: 14px; margin-top: 22px; max-width: 70ch; }
+  details { margin-top: 18px; }
+  summary { cursor: pointer; color: var(--muted); font-size: 15px; }
+  table { border-collapse: collapse; width: 100%; margin-top: 12px; font-size: 14px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 500; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .table-scroll { overflow-x: auto; }
+
+  /* Features */
+  .feats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 34px 40px; }
+  .feats p { margin: 0; color: var(--muted); font-size: 15.5px; }
+
+  /* Install */
+  .install { display: grid; grid-template-columns: 1.1fr 1fr; gap: 48px; align-items: start; }
+  .install ol { margin: 0; padding-left: 1.3em; }
+  .install li { margin-bottom: 14px; }
+  .install li::marker { font-weight: 600; }
+  pre { margin: 0; background: var(--term); color: var(--term-ink); font: 14px/1.7 var(--mono); padding: 20px 22px; border-radius: 12px; overflow-x: auto; }
+  pre .c { color: var(--term-dim); }
+  code.inline { font: 14.5px var(--mono); background: var(--panel); border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px; }
+  .costs { margin-top: 30px; border-top: 1px solid var(--line); padding-top: 22px; }
+  .costs p { margin: 0 0 8px; color: var(--muted); }
+  .costs b { color: var(--ink); font-weight: 600; }
+
+  footer { margin-top: 110px; padding: 30px 0 44px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+
+  @media (max-width: 860px) {
+    .panes { grid-template-columns: 1fr; min-height: 0; }
+    .pane { border-right: 0; border-bottom: 1px solid #22324b; min-height: 200px; }
+    .steps { grid-template-columns: 1fr 1fr; border-top: 0; gap: 8px 20px; }
+    .steps li { border-top: 2px solid var(--ink); }
+    .charts, .install { grid-template-columns: 1fr; gap: 40px; }
+    .feats { grid-template-columns: 1fr 1fr; }
+    .said figure { grid-template-columns: 1fr; }
+    .said .was { grid-column: 1; }
+  }
+  @media (max-width: 560px) {
+    .wrap { padding: 0 16px; }
+    .feats, .steps { grid-template-columns: 1fr; }
+    .row { grid-template-columns: 8.5rem 1fr 3rem; font-size: 13px; }
+    .tmux { font-size: 13px; }
+    .cmd { width: 100%; align-items: flex-start; }
+    .cmd code { white-space: normal; overflow-wrap: anywhere; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a class="wordmark" href="./">tmux-voice<span class="dot" aria-hidden="true"></span></a>
+    <nav class="nav"><a class="lang" href="../" hreflang="en" lang="en">English</a>
+    <a class="gh" href="https://github.com/imurodl/tmux-voice">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      GitHub
+    </a></nav>
+  </header>
+
+  <section class="hero">
+    <h1><span>Bosib turing.</span><span>Gapiring.</span><span>Matn promptda.</span></h1>
+    <p class="lede">tmux ichidagi <strong>Claude Code va Codex</strong> uchun push-to-talk. Inglizcha, o‘zbekcha, koreyscha yoki bitta gapda uchalasini aralashtirib gapiring. Matn agentingiz promptiga tushadi, javobi esa sizga ovoz chiqarib o‘qib beriladi.</p>
+    <div class="cta">
+      <div class="cmd"><span class="prompt-sign" aria-hidden="true">$</span><code id="install-cmd">git clone https://github.com/imurodl/tmux-voice &amp;&amp; cd tmux-voice &amp;&amp; ./install.sh</code><button class="copy" type="button" data-copy="install-cmd">Nusxalash</button></div>
+      <a class="btn" href="https://github.com/imurodl/tmux-voice"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 .25a.75.75 0 01.673.418l1.882 3.815 4.21.612a.75.75 0 01.416 1.279l-3.046 2.97.719 4.192a.75.75 0 01-1.088.791L8 12.347l-3.766 1.98a.75.75 0 01-1.088-.79l.72-4.194L.818 6.374a.75.75 0 01.416-1.28l4.21-.611L7.327.668A.75.75 0 018 .25z"/></svg>GitHub’da yulduzcha bosing</a>
+    </div>
+
+    <div class="demo" role="img" aria-label="Demo: Right Option bosib turilib, o‘zbekcha-inglizcha aralash gapirilganda gap tmux ichidagi Claude Code promptiga yoziladi; Claude javob beradi va qisqa xulosa ovozda o‘qiladi. Keyin “Codex” bilan boshlangan koreyscha so‘rov Codex paneliga boradi.">
+      <div class="tmux" aria-hidden="true">
+        <div class="chrome"><i></i><i></i><i></i><span>tmux: work</span></div>
+        <div class="status"><span class="win">[work] <b>1:agents*</b> 2:server</span><span class="vs" id="vs"></span></div>
+        <div class="panes">
+          <section class="pane active" data-pane="claude">
+            <div class="pane-name"><b>claude</b><span>~/projects/shop</span></div>
+            <div class="log"></div>
+            <div class="input"><span class="gt">&gt;</span><span class="text"></span><span class="caret"></span></div>
+          </section>
+          <section class="pane" data-pane="codex">
+            <div class="pane-name"><b>codex</b><span>~/projects/shop</span></div>
+            <div class="log"></div>
+            <div class="input"><span class="gt">›</span><span class="text"></span><span class="caret"></span></div>
+          </section>
+        </div>
+      </div>
+      <div class="under" aria-hidden="true">
+        <div class="hold"><span class="key" id="key">Right Option</span><span class="wave" id="wave"></span><span id="hold-hint">gapirish uchun bosib turing</span></div>
+        <div class="spoken" id="spoken"><svg viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg><span>Ovozda o‘qildi: <em id="spoken-text"></em></span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="languages">
+    <h2>O‘ylaganingizdek gapiring</h2>
+    <p class="sub">Ko‘pchiligimiz bitta tilda o‘ylamaymiz. Til har bir yozuvda qaytadan aniqlanadi, shuning uchun gap o‘rtasida tilni almashtirish muammo emas. Quyidagilar sinov yozuvlaridan olingan haqiqiy transkriptlar, hech qanday tahrirsiz.</p>
+    <div class="said">
+      <figure>
+        <figcaption>O‘zbekcha + inglizcha</figcaption>
+        <div class="line">Dashboard sahifasida loading juda sekin. <mark>useEffect</mark> ichida nima ikki marta chaqirilyapti, shuni topib ber.</div>
+        <div class="was">Loyiha so‘zlarisiz: <s>User effect</s> ichida nima ikki marta chaqirilyapti</div>
+      </figure>
+      <figure>
+        <figcaption>O‘zbekcha + inglizcha</figcaption>
+        <div class="line"><mark>Tailscale</mark> orqali micro2 ga SSH qil, lekin uni stop yoki restart qilma. Faqat <mark>PM2</mark> loglarini ko'rsat.</div>
+        <div class="was">Loyiha so‘zlarisiz: <s>Telnet</s> orqali Micro2 ga SSH qil … Faqat <s>theme2</s> loglarini ko'rsat.</div>
+      </figure>
+      <figure>
+        <figcaption>Koreyscha + inglizcha</figcaption>
+        <div class="line" lang="ko">Claude, 이 화면의 버튼 텍스트를 한국어로 바꿔줘 <span lang="en">and then run the tests.</span></div>
+      </figure>
+      <figure>
+        <figcaption>Inglizcha + o‘zbekcha</figcaption>
+        <div class="line">Okay so the thing is, foydalanuvchi login qilganda token refresh bo'lmayapti. Menimcha muammo <mark>Supabase</mark> clientda, lekin aniq bilmayman. Avval loglarni ko'rib chiq.</div>
+      </figure>
+    </div>
+  </section>
+
+  <section class="block" id="how">
+    <h2>Qo‘yib yuborganingizda nima bo‘ladi</h2>
+    <p class="sub">Barcha ishni kompyuteringizdagi kichik daemon bajaradi. Tugmani Hammerspoon ushlaydi; bulutga faqat transkripsiya uchun audio yuboriladi.</p>
+    <ol class="steps">
+      <li><span class="n">1</span><h3>Yozib olish</h3><p>Tugmani bosib turganingizda mikrofon yozadi. Boshqa tugmani bossangiz, bekor qilinadi.</p></li>
+      <li><span class="n">2</span><h3>So‘zlarni bilish</h3><p>Repo nomi, branch, o‘zgargan fayllar, dependency’lar va SSH hostlar key term sifatida birga yuboriladi.</p></li>
+      <li><span class="n">3</span><h3>Transkripsiya</h3><p>ElevenLabs Scribe v2, u ishlamasa avtomatik ravishda Gemini 3.5 Transcribe.</p></li>
+      <li><span class="n">4</span><h3>Joyiga qo‘yish</h3><p>Aktiv tmux paneliga, Enter bosilmasdan. Yoki siz nomlagan panelga: “Codex, …”.</p></li>
+      <li><span class="n">5</span><h3>Javobni eshitish</h3><p>Ovoz bilan boshlagan so‘rovingiz tugaganda, agent javobining birinchi gapi ovozda o‘qiladi.</p></li>
+    </ol>
+  </section>
+
+  <section class="block" id="numbers">
+    <h2>Va’da emas, o‘lchov</h2>
+    <p class="sub">Buni qurishdan oldin sakkizta speech-to-text varianti aralash o‘zbekcha-inglizcha dasturchi promptlarining 17 ta haqiqiy yozuvida sinab ko‘rildi. Har bir yozuv bir vaqtning o‘zida barcha variantlarga yuborildi.</p>
+    <div class="charts">
+      <div class="chart">
+        <h3>So‘z xatoligi darajasi</h3>
+        <p class="unit">Qanchalik past bo‘lsa, shuncha yaxshi</p>
+        <div class="bars" id="wer"></div>
+      </div>
+      <div class="chart">
+        <h3>To‘g‘ri yozilgan kod atamalari</h3>
+        <p class="unit">Fayl, vosita va kutubxona nomlari; qanchalik yuqori bo‘lsa, shuncha yaxshi</p>
+        <div class="bars" id="terms"></div>
+      </div>
+    </div>
+    <p class="fine">Bitta odam, MacBook mikrofoni, 15 ta matnli va 2 ta erkin yozuv. Sizning tilingiz va talaffuzingizda raqamlar boshqacha chiqadi, shuning uchun vosita aynan shu sinov sahifasi bilan birga keladi: <code class="inline">uv run tmux-voice bench</code>.</p>
+    <details>
+      <summary>Jadval ko‘rinishida</summary>
+      <div class="table-scroll"><table id="table"><thead><tr><th>Variant</th><th class="num">So‘z xatoligi</th><th class="num">To‘g‘ri kod atamalari</th><th class="num">Odatiy kechikish</th></tr></thead><tbody></tbody></table></div>
+    </details>
+  </section>
+
+  <section class="block" id="features">
+    <h2>Har kuni asqatadigan mayda narsalar</h2>
+    <div class="feats">
+      <div><h3>Matn tushadi, o‘zi yuborilmaydi</h3><p>Hech narsa siz o‘rningizga yuborilmaydi. O‘qing, kerak bo‘lsa so‘zni tuzating, Enter bosing. Xohlasangiz, oxirida “send it” deng.</p></div>
+      <div><h3>Terminaldan tashqarida ham</h3><p>Oldingizda Slack yoki brauzer ochiq bo‘lsa, matn o‘sha yerga yoziladi.</p></div>
+      <div><h3>Ko‘p uchraydigan xatolarni tuzatadi</h3><p>“cloud MD” CLAUDE.md bo‘ladi. “Cloud, run the tests” Claude’ga boradi. O‘z qoidalaringizni ham qo‘shishingiz mumkin.</p></div>
+      <div><h3>Holat ko‘z oldingizda</h3><p>tmux status satrida va menyu panelida qizil REC va sariq STT.</p></div>
+      <div><h3>O‘zini o‘zi tiklaydi</h3><p>Daemon javob bermay qolsa, watchdog uni qayta ishga tushiradi.</p></div>
+      <div><h3>Narxini ko‘rsatadi</h3><p><code class="inline">tmux-voice usage</code> kuniga necha daqiqa gapirganingizni va taxminiy xarajatni ko‘rsatadi.</p></div>
+    </div>
+  </section>
+
+  <section class="block" id="install">
+    <h2>Besh daqiqada sozlang</h2>
+    <div class="install">
+      <div>
+        <ol>
+          <li>Repo’ni clone qilib, installer’ni ishga tushiring. U yetishmayotganlarini (tmux, uv, Hammerspoon) so‘rab o‘rnatadi va ElevenLabs yoki Gemini API kalitini so‘raydi.</li>
+          <li>System Settings → Privacy &amp; Security → Accessibility’da Hammerspoon’ni yoqing, keyin uni yopib, qayta oching.</li>
+          <li>Right Option’ni bosib turing, biror narsa deng va qo‘yib yuboring. Birinchi marta mikrofonga ruxsat bering.</li>
+        </ol>
+        <p class="sub" style="margin:18px 0 0">Konfiglaringizdagi har bir o‘zgarish belgilanadi va oldin zaxira nusxasi olinadi, <code class="inline">./uninstall.sh</code> esa hammasini olib tashlaydi. Hozircha faqat macOS.</p>
+        <div class="costs">
+          <p><b>Narxi:</b> Scribe v2’da bir soatlik nutq taxminan $0.27. Qizg‘in ish kunida 30–60 daqiqa gapiriladi, demak har kuni ishlatsangiz oyiga taxminan $3–6.</p>
+          <p><b>Agent obunangiz:</b> deyarli sezilmaydi. Ovozli prompt o‘n minglab token ishlaydigan har bir turnga bor-yo‘g‘i bir necha o‘nta token qo‘shadi.</p>
+        </div>
+      </div>
+      <pre><code><span class="c"># o‘rnatish</span>
+git clone https://github.com/imurodl/tmux-voice
+cd tmux-voice
+./install.sh
+
+<span class="c"># hammasi to‘g‘ri ulanganini tekshirish</span>
+uv run tmux-voice doctor
+
+<span class="c"># provayderlarni o‘z ovozingizda sinash</span>
+uv run tmux-voice bench</code></pre>
+    </div>
+  </section>
+
+  <footer>
+    <span>MIT litsenziyasi. Muallif: <a href="https://github.com/imurodl">Murod Mirzaliev</a>, Seul. Asosan gapirib yozilgan.</span>
+    <a href="https://github.com/imurodl/tmux-voice">github.com/imurodl/tmux-voice</a>
+  </footer>
+</div>
+
+<script>
+// Bake-off results, 17 clips of mixed Uzbek/English (2026-10-24).
+const RESULTS = [
+  { name: "Scribe v2 + key terms", wer: 14.3, terms: 94, ms: 1706, win: true },
+  { name: "Gemini 3.5 + key terms", wer: 17.0, terms: 84, ms: 1028 },
+  { name: "Google Chirp 3", wer: 21.0, terms: 48, ms: 3783 },
+  { name: "Gemini 3.5", wer: 25.3, terms: 55, ms: 1025 },
+  { name: "Scribe v2", wer: 26.4, terms: 61, ms: 1693 },
+  { name: "VoiceLab", wer: 27.5, terms: 45, ms: 2490 },
+  { name: "gpt-4o-transcribe + prompt", wer: 27.8, terms: 65, ms: 2111 },
+  { name: "gpt-4o-transcribe", wer: 55.2, terms: 32, ms: 2076 },
+];
+
+function bars(id, key, max, fmt) {
+  const el = document.getElementById(id);
+  const tip = document.createElement("div");
+  tip.className = "tip";
+  el.style.position = "relative";
+  RESULTS.forEach(r => {
+    const row = document.createElement("div");
+    row.className = "row" + (r.win ? " win" : "");
+    row.tabIndex = 0;
+    row.setAttribute("aria-label", `${r.name}: ${fmt(r[key])}`);
+    row.innerHTML = `<span class="name">${r.name}</span><span class="track"><span class="fill" style="display:block;width:${(r[key] / max) * 100}%"></span></span><span class="val">${fmt(r[key])}</span>`;
+    const show = () => {
+      tip.innerHTML = `<b>${r.name}</b><br>So‘z xatoligi ${r.wer}%<br>To‘g‘ri kod atamalari ${r.terms}%<br>Odatiy kechikish ${(r.ms / 1000).toFixed(1)} s`;
+      tip.style.left = row.querySelector(".track").offsetLeft + "px";
+      tip.style.top = (row.offsetTop - 50) + "px";
+      tip.classList.add("on");
+    };
+    row.addEventListener("mouseenter", show);
+    row.addEventListener("focus", show);
+    row.addEventListener("mouseleave", () => tip.classList.remove("on"));
+    row.addEventListener("blur", () => tip.classList.remove("on"));
+    el.appendChild(row);
+  });
+  el.appendChild(tip);
+}
+bars("wer", "wer", 60, v => v.toFixed(1) + "%");
+bars("terms", "terms", 100, v => v + "%");
+document.querySelector("#table tbody").innerHTML = RESULTS.map(r =>
+  `<tr><td>${r.name}</td><td class="num">${r.wer.toFixed(1)}%</td><td class="num">${r.terms}%</td><td class="num">${(r.ms / 1000).toFixed(1)} s</td></tr>`).join("");
+
+document.querySelectorAll("[data-copy]").forEach(b => b.addEventListener("click", async () => {
+  const text = document.getElementById(b.dataset.copy).textContent;
+  try { await navigator.clipboard.writeText(text); b.textContent = "Nusxalandi"; }
+  catch { b.textContent = "Belgilab nusxalang"; }
+  setTimeout(() => (b.textContent = "Nusxalash"), 1800);
+}));
+
+// Demo
+const SCENES = [
+  { focus: "claude", to: "claude",
+    said: "Auth middleware'ni refactor qil, keyin hamma testlarni run qilib chiq.",
+    reply: ["● Moved token checks in middleware/auth.ts to the shared validator.", "● Ran the test suite: 42 passed."],
+    spoken: "Moved the token checks to the shared validator. All 42 tests pass." },
+  { focus: "claude", to: "codex",
+    said: "Codex, 로그인 버튼이 안 눌려요. 원인을 찾아서 고쳐 주세요.", typed: "로그인 버튼이 안 눌려요. 원인을 찾아서 고쳐 주세요.",
+    reply: ["• An invisible overlay sat on top of the button (z-index 50).", "• Fixed in LoginForm.tsx. The click goes through now."],
+    spoken: "An invisible overlay covered the login button. Fixed in LoginForm." },
+  { focus: "claude", to: "claude",
+    said: "Okay so the thing is, token refresh bo'lmayapti. Avval loglarni ko'rib chiq, keyin taxmin qil.",
+    reply: ["● The refresh cookie is set on /api, but refresh calls /auth.", "● Fix: set the cookie path to /. Want me to apply it?"],
+    spoken: "The refresh cookie has the wrong path. Want me to apply the fix?" },
+];
+const $ = s => document.querySelector(s);
+const pane = n => document.querySelector(`.pane[data-pane="${n}"]`);
+const wait = ms => new Promise(r => setTimeout(r, ms));
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const wave = $("#wave");
+for (let i = 0; i < 18; i++) wave.appendChild(document.createElement("i"));
+let waving = null;
+
+function setFocus(name) {
+  document.querySelectorAll(".pane").forEach(p => p.classList.toggle("active", p.dataset.pane === name));
+}
+function addLine(p, text, cls) {
+  const el = document.createElement("p");
+  if (cls) el.className = cls;
+  el.textContent = text;
+  const log = p.querySelector(".log");
+  log.appendChild(el);
+  while (log.children.length > 6) log.firstChild.remove();
+}
+function startWave() {
+  wave.classList.add("on");
+  waving = setInterval(() => wave.querySelectorAll("i").forEach(i => (i.style.height = 4 + Math.random() * 22 + "px")), 90);
+}
+function stopWave() {
+  clearInterval(waving);
+  wave.classList.remove("on");
+  wave.querySelectorAll("i").forEach(i => (i.style.height = "4px"));
+}
+
+function staticFrame() {
+  const s = SCENES[0], p = pane("claude");
+  addLine(p, "> " + s.said, "you");
+  s.reply.forEach(l => addLine(p, l));
+  $("#spoken-text").textContent = s.spoken;
+  $("#spoken").classList.add("on");
+}
+
+async function play(s) {
+  setFocus(s.focus);
+  $("#spoken").classList.remove("on");
+  await wait(900);
+  $("#key").classList.add("down"); $("#hold-hint").textContent = "yozilmoqda";
+  $("#vs").textContent = "● REC"; $("#vs").className = "vs rec";
+  startWave();
+  await wait(Math.min(5200, 1400 + s.said.length * 38));
+  stopWave();
+  $("#key").classList.remove("down"); $("#hold-hint").textContent = "qo‘yib yuborildi";
+  $("#vs").textContent = "… STT"; $("#vs").className = "vs stt";
+  await wait(1100);
+  $("#vs").textContent = ""; $("#hold-hint").textContent = "gapirish uchun bosib turing";
+  const target = pane(s.to);
+  if (s.to !== s.focus) { $("#hold-hint").textContent = "\u201cCodex, \u2026\u201d uni Codex paneliga yuboradi"; setFocus(s.to); await wait(250); }
+  const box = target.querySelector(".input .text");
+  const text = s.typed || s.said;
+  for (const ch of text) { box.textContent += ch; await wait(16); }
+  await wait(1300);
+  addLine(target, (s.to === "codex" ? "› " : "> ") + text, "you");
+  box.textContent = "";
+  await wait(900);
+  for (const l of s.reply) { addLine(target, l); await wait(700); }
+  $("#spoken-text").textContent = s.spoken;
+  $("#spoken").classList.add("on");
+  await wait(4200);
+  $("#hold-hint").textContent = "gapirish uchun bosib turing";
+}
+
+if (reduced) staticFrame();
+else (async () => { for (let i = 0; ; i = (i + 1) % SCENES.length) await play(SCENES[i]); })();
+</script>
+</body>
+</html>
