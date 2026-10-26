@@ -134,10 +134,20 @@ def recording() -> bool:
     return state["rec"] is not None
 
 
+def _open_input() -> sd.InputStream:
+    try:
+        return sd.InputStream(samplerate=RATE, channels=1, dtype="int16", blocksize=1600)
+    except sd.PortAudioError:
+        # PortAudio lists devices once at startup; after a mic comes or goes (AirPods, iPhone) the cached default is stale.
+        sd._terminate()
+        sd._initialize()
+        return sd.InputStream(samplerate=RATE, channels=1, dtype="int16", blocksize=1600)
+
+
 def _record(stop: threading.Event, frames: list[np.ndarray], ready: threading.Event):
     # Blocking reads keep Python out of the CoreAudio IO thread; a callback stream can deadlock on stop.
     try:
-        with sd.InputStream(samplerate=RATE, channels=1, dtype="int16", blocksize=1600) as stream:
+        with _open_input() as stream:
             ready.set()
             while not stop.is_set():
                 data, _ = stream.read(1600)
